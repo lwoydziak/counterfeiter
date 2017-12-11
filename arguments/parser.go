@@ -73,6 +73,7 @@ func (argParser *argumentParser) parseInterfaceArgs(args ...string) ParsedArgume
 
 	return ParsedArguments{
 		GenerateInterfaceAndShimFromPackageDirectory: false,
+		GenerateMockitoStyleMocks: 										*mockitoFlag,
 		SourcePackageDir:                             sourcePackageDir,
 		OutputPath:                                   outputPath,
 		ImportPath:                                   importPath,
@@ -119,6 +120,7 @@ type argumentParser struct {
 
 type ParsedArguments struct {
 	GenerateInterfaceAndShimFromPackageDirectory bool
+	GenerateMockitoStyleMocks bool
 
 	SourcePackageDir string // abs path to the dir containing the interface to fake
 	ImportPath       string // import path to the package containing the interface to fake

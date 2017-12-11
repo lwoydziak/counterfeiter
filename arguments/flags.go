@@ -22,4 +22,10 @@ var (
 		false,
 		"whether or not to generate a package shim",
 	)
+
+	mockitoFlag = flag.Bool(
+		"m",
+		false,
+		"produce mockito style mocks",
+	)
 )

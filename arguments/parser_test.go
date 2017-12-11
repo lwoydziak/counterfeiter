@@ -10,9 +10,96 @@ import (
 
 	"github.com/maxbrunsfeld/counterfeiter/terminal/terminalfakes"
 
+	"fmt"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+type Testing interface {
+	testMethod() bool
+}
+
+type MockTesting struct {
+	called    bool
+	collector map[string] AnswerCollector
+}
+
+func (s *MockTesting) testMethod() bool {
+	fmt.Print("Called Mock testMethod")
+	s.called = true
+	methodResolved := fmt.Sprintf("%#v", Testing.testMethod)
+	ourAnswers := s.collector[methodResolved].getAnswers()
+	ourAnswer := ourAnswers[0]
+	return ourAnswer.(bool)
+}
+
+func (s *MockTesting) getAnswerCollector(method interface{}) AnswerCollector {
+	methodResolved := fmt.Sprintf("%#v", method)
+	answers, ok := s.collector[methodResolved]
+	if !ok {
+		answers = &TestAnswerCollector{}
+		if s.collector == nil {
+			s.collector = make(map[string] AnswerCollector)
+		}
+	}
+	s.collector[methodResolved] = answers
+	return answers
+}
+
+func (s *MockTesting) getVerifier() interface{} {
+	return &VerifierTesting{parent: s}
+}
+
+// --------------------------------------------------------------------------- verifier
+type VerifierTesting struct {
+	parent *MockTesting
+}
+
+func (r *VerifierTesting) testMethod() bool {
+	if r.parent.called == true {
+		fmt.Print("testMethod was called")
+	} else {
+		panic("testMethod was not called")
+	}
+	return true
+}
+
+type Verifier interface {
+	getVerifier() interface{}
+}
+
+func verify(verifier Verifier) interface{} {
+	return verifier.getVerifier()
+}
+
+// -------------------------------------------------- Primer
+type AnswerCollector interface {
+	thenReturn(returnValues ...interface{}) AnswerCollector
+	getAnswers() []interface{}
+}
+
+type TestAnswerCollector struct {
+	answers [][]interface{}
+}
+
+func (s *TestAnswerCollector) thenReturn(returnValues ...interface{}) AnswerCollector {
+	s.answers = append(s.answers, returnValues)
+	return s
+}
+
+func (s *TestAnswerCollector) getAnswers() []interface{} {
+	var answer []interface{}
+	answer, s.answers = s.answers[0], s.answers[1:]
+	return answer
+}
+
+type Primer interface {
+	getAnswerCollector(method interface{}) AnswerCollector
+}
+
+func when(primer Primer, method interface{}) AnswerCollector {
+	return primer.getAnswerCollector(method)
+}
 
 var _ = Describe("parsing arguments", func() {
 	var subject ArgumentParser
@@ -109,6 +196,34 @@ var _ = Describe("parsing arguments", func() {
 					"fake_an_interface.go",
 				),
 			))
+		})
+
+		It("parsed args is not set for mockito flag", func() {
+			Expect(parsedArgs.GenerateMockitoStyleMocks).To(BeFalse())
+		})
+
+		It("should do something", func() {
+			mock := &MockTesting{called: false}
+
+			when(mock, Testing.testMethod).thenReturn(false).thenReturn(true).thenReturn(false)
+
+			val := mock.testMethod()
+			Expect(val).To(BeFalse())
+
+			val = mock.testMethod()
+			Expect(val).To(BeTrue())
+
+			val = mock.testMethod()
+			Expect(val).To(BeTrue())
+		})
+
+		Context("when -m is provided", func() {
+			BeforeEach(func() {
+				*mockitoFlag = true
+			})
+			It("parsed args sets mockito flag", func() {
+				Expect(parsedArgs.GenerateMockitoStyleMocks).To(BeTrue())
+			})
 		})
 	})
 
